@@ -98,6 +98,7 @@
         // Αν υπάρχει pDay, το χρησιμοποιούμε, αλλιώς ένα γενικό τίτλο.
         document.title = pDay ? `${pDay}` : 'Πρόγραμμα αγώνων';
         //--- για να εμφανιστεί η ημέρα της εβδομαδάς
+        const dayAndDateHeaderElement = document.getElementById("dayAndDateHeader");
         dayAndDateHeaderElement.textContent = pDay;
 
 
