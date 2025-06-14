@@ -337,7 +337,7 @@
                         // 3. Η τρέχουσα ώρα είναι ΠΡΙΝ από 2 ώρες μετά την ώρα έναρξης του αγώνα
                         if (matchDate.getTime() === today.getTime() && // Έλεγχος αν είναι η ίδια ημέρα
                             now.getTime() >= matchStartDateTime.getTime() &&
-                            now.getTime() < twoHoursAfterAfterStart.getTime()) {
+                            now.getTime() < twoHoursAfterStart.getTime()) {
                             
                             timeClass += ' highlight-time'; // Προσθέτουμε την κλάση για κόκκινο χρώμα
                         }
