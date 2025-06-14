@@ -97,6 +97,9 @@
         // Θέτουμε τον τίτλο της σελίδας (στο <head><title>).
         // Αν υπάρχει pDay, το χρησιμοποιούμε, αλλιώς ένα γενικό τίτλο.
         document.title = pDay ? `${pDay}` : 'Πρόγραμμα αγώνων';
+        //--- για να εμφανιστεί η ημέρα της εβδομαδάς
+        dayAndDateHeaderElement.textContent = pDay;
+
 
         // Εδώ μπορείτε να χρησιμοποιήσετε το globalPPowerText για να ενημερώσετε κάποιο <h1> ή άλλο στοιχείο.
         /* --- ας τρέξει αρχικα και θα το αλλάξουμε μετά αν το χρειασθούμε
@@ -108,6 +111,7 @@
         }
 
         */
+
 
         drawDiorganvseis();
     }
@@ -914,6 +918,17 @@
             border-bottom: 5px solid #ff0040;
         }
 
+        /* ΝΕΟ: Στυλ για το header με την ημέρα και την ημερομηνία */
+        #dayAndDateHeader {
+            color: #003e5e; /* Κάποιο χρώμα που ταιριάζει */
+            font-size: 1.1em; /* Μέγεθος γραμματοσειράς */
+            font-weight: bold; /* Έντονη γραμματοσειρά */
+            margin-bottom: 10px; /* Απόσταση από τον διακόπτη */
+            text-transform: uppercase; /* Προαιρετικά: κεφαλαία γράμματα */
+        }
+
+
+
         .MatchcenterHomepageOmilos__header {
             background-color: #e2e4e6;
             color: #003e5e;
@@ -1310,6 +1325,8 @@
                 <h3 class="MatchcenterHomepageWidget__header">
                     MATCH<small class="text-body-secondary">CENTER</small>
                 </h3>
+                <div id="dayAndDateHeader" class="text-center mb-2">
+                </div>                
 
                 <div class="custom-toggle-container text-center mb-3">
                     <label class="custom-toggle-switch">
