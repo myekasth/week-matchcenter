@@ -31,51 +31,105 @@
 
         // Set a callback to run when the Google Visualization API is loaded.
         google.charts.setOnLoadCallback(drawchart);
+	    
+	//****----- Δημιορυγργία URL από παραμέτρους εξωτερικούς αν υπάρχουν
 
+let globalPPowerText = '';
 
+/**
+ * Αντιστοίχιση ονομάτων ημερών σε GID.
+ * Χρησιμοποιούμε ένα αντικείμενο για εύκολη αναζήτηση.
+ */
+const DAY_TO_GID_MAP = {
+    "ΔΕΥΤΕΡΑ": "1202659941",
+    "ΤΡΙΤΗ": "1877288040",
+    "ΤΕΤΑΡΤΗ": "299404080",
+    "ΠΕΜΠΤΗ": "947447781",
+    "ΠΑΡΑΣΚΕΥΗ": "1012641663",
+    "ΣΑΒΒΑΤΟ": "1503164165",
+    "ΚΥΡΙΑΚΗ": "928645356"
+};
 
-        // Global variables for data and row count, as they are used across functions
-        let data;
-        let posesEggrafes;
-
-        // --- Global Variables (Δηλώστε αυτές στην κορυφή του script σας) ---
-        // Αυτά θα αποθηκεύουν τα HTML στοιχεία των αγώνων για εύκολο φιλτράρισμα
-        const allMatchDefinitionItems = [];
-        // Αυτά θα συλλέγουν τα μοναδικά ονόματα για τα dropdowns
-        const uniqueReferees = new Set();
-        const uniqueCommissioners = new Set();
-        const uniqueJudges = new Set();
-        const uniqueGhpeda = new Set(); // ΝΕΟ: Set για τα γήπεδα
-        const uniqueTeams = new Set(); // ΝΕΟ: Set για τις ομάδες
-
-
-        function drawchart() {
-            drawDiorganvseis();
-        };
-
-        function drawDiorganvseis() {
-            let queryString;
-            let strQueryForURI;
-
-            // 1. Πάρε τη σημερινή ημερομηνία
-            const today = new Date();
-            // 2. Μορφοποίησε τη σημερινή ημερομηνία σε YYYY-MM-dd
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0'); // getMonth() είναι 0-indexed, οπότε +1
-            const day = String(today.getDate()).padStart(2, '0');
-
-            const formattedDate = `${year}-${month}-${day}`; // Παράδειγμα: "2025-06-10"
-            // 3. Δημιούργησε τη συμβολοσειρά του QUERY
-            strQueryForURI = `select * where D = date '${formattedDate}' order by D,B,A,E`;
-
-            //--- console.log(strQueryForURI);
-
-            queryString = encodeURIComponent(strQueryForURI);
-            // Replace with your actual Google Sheet ID
-            let query = new google.visualization.Query('https://docs.google.com/spreadsheets/d/17qZ43Fd2oYEV_lESKjOrqIOMurNDg5prJkyFuUH4aJA/gviz/tq?gid=6&headers=1&tq=' + queryString);
-
-            query.send(handle_DrawDiorganvseis_DataQueryResponse);
+/**
+ * Αναλύει τις παραμέτρους του URL.
+ * @param {string} variable Το όνομα της παραμέτρου query που θέλουμε να ανακτήσουμε.
+ * @returns {string|null} Η αποκωδικοποιημένη τιμή της παραμέτρου, ή null αν δεν βρεθεί.
+ */
+function getQueryVariable(variable) {
+    const query = window.location.search.substring(1);
+    const vars = query.split("&");
+    for (let i = 0; i < vars.length; i++) {
+        const pair = vars[i].split("=");
+        if (pair[0] === variable) {
+            return decodeURIComponent(pair[1]);
         }
+    }
+    return null;
+}
+
+/**
+ * Εκκινεί τη διαδικασία σχεδίασης του γραφήματος/ανάκτησης δεδομένων.
+ * Θέτει τον τίτλο της σελίδας και καλεί τη συνάρτηση για ανάκτηση δεδομένων.
+ */
+function drawchart() {
+    const pDay = getQueryVariable("pDay");
+    const pPower = getQueryVariable("pPower");
+
+    // Ενημερώνουμε την καθολική μεταβλητή με την τιμή του pPower για μελλοντική χρήση εμφάνισης.
+    globalPPowerText = pPower || ''; // Αν δεν υπάρχει, ορίζουμε κενό string.
+
+    // Θέτουμε τον τίτλο της σελίδας (στο <head><title>).
+    // Αν υπάρχει pDay, το χρησιμοποιούμε, αλλιώς ένα γενικό τίτλο.
+    document.title = pDay ? `Δεδομένα για ${pDay}` : 'Δεδομένα Google Sheet';
+
+    // Εδώ μπορείτε να χρησιμοποιήσετε το globalPPowerText για να ενημερώσετε κάποιο <h1> ή άλλο στοιχείο.
+    const diorganvshTitleElement = document.getElementById("diorganvsh-title");
+    if (diorganvshTitleElement && globalPPowerText) {
+        diorganvshTitleElement.innerHTML = `Οργανωση: ${globalPPowerText}`;
+    } else if (diorganvshTitleElement) {
+         diorganvshTitleElement.innerHTML = 'Δεδομένα Οργανώσεων'; // Προεπιλεγμένος τίτλος αν δεν υπάρχει pPower
+    }
+
+
+    drawDiorganvseis();
+}
+
+/**
+ * Ανακτά δεδομένα από ένα Google Sheet με βάση τις παραμέτρους pID και pDay.
+ * Χειρίζεται προεπιλεγμένες τιμές και μετατρέπει το pDay σε GID.
+ */
+function drawDiorganvseis() {
+    // Ανακτήσεις παραμέτρων από το URL.
+    const pID = getQueryVariable("pID");
+    const pDay = getQueryVariable("pDay"); // Π.χ. "ΔΕΥΤΕΡΑ"
+
+    // Ορίζουμε την προεπιλεγμένη τιμή για το pID αν δεν παρέχεται.
+    const spreadsheetID = pID || "17qZ43Fd2oYEV_lESKjOrqIOMurNDg5prJkyFuUH4aJA";
+
+    // Βρίσκουμε το GID με βάση την ημέρα.
+    // Μετατρέπουμε την ημέρα σε κεφαλαία για να ταιριάζει με το DAY_TO_GID_MAP, αν χρειάζεται.
+    // Αν δεν βρεθεί η ημέρα ή δεν δοθεί pDay, χρησιμοποιούμε το gid=0 (συνήθως το πρώτο φύλλο).
+    const gid = pDay ? (DAY_TO_GID_MAP[pDay.toUpperCase()] || "0") : "0";
+
+    // Το SELECT query φέρνει όλες τις εγγραφές, ανεξάρτητα από το pPower.
+    const strQueryForURI = 'select * order by D desc';
+    const encodedQueryString = encodeURIComponent(strQueryForURI);
+
+    // Δημιουργία του URL για το Google Sheets API.
+    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetID}/gviz/tq?gid=${gid}&headers=1&tq=${encodedQueryString}`;
+
+    console.log("Συνταγμένο URL για το Google Sheet:", spreadsheetUrl);
+
+    // Εκτέλεση του query.
+    const query = new google.visualization.Query(spreadsheetUrl);
+    query.send(handle_DrawDiorganvseis_DataQueryResponse);
+}
+	    
+
+
+
+
+	//***************
 
         function handle_DrawDiorganvseis_DataQueryResponse(response) {
 
