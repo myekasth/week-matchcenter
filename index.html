@@ -1,0 +1,1328 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+	<meta name="description" content=" " />
+	<meta name="keywords" content="MatchCenter, games, results, ranking, referes, table offcers, champions" />
+	<meta name="language" content="greek" />
+	<meta name="author" content="TODAY MatchCenter" />
+	<meta name="web_author" content="Lazaros T" />
+    <link rel="icon" href="favicon.ico" />    
+
+
+    <title>| Πρόγραμμα αγώνων</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Krona+One&display=swap" rel="stylesheet"/>
+
+    <!-- link href="https://fonts.googleapis.com/css2?family=Mansalva&display=swap" rel="stylesheet" /  -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous" />
+    <link href="https://use.fontawesome.com/releases/v5.1.1/css/all.css" rel="stylesheet" xintegrity="sha384-O8whS3fhG2OnA5Kas0Y9l3cfpmYjapjI0E4theH4iuMD+pLhbf6JI0jIMfYcK3yZ" crossorigin="anonymous" />
+
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+    <script type="text/javascript">
+        // Load the Visualization API and the piechart package.
+        google.charts.load('current', { 'packages': ['corechart'] });
+
+        // Set a callback to run when the Google Visualization API is loaded.
+        google.charts.setOnLoadCallback(drawchart);
+
+
+
+        // Global variables for data and row count, as they are used across functions
+        let data;
+        let posesEggrafes;
+
+        // --- Global Variables (Δηλώστε αυτές στην κορυφή του script σας) ---
+        // Αυτά θα αποθηκεύουν τα HTML στοιχεία των αγώνων για εύκολο φιλτράρισμα
+        const allMatchDefinitionItems = [];
+        // Αυτά θα συλλέγουν τα μοναδικά ονόματα για τα dropdowns
+        const uniqueReferees = new Set();
+        const uniqueCommissioners = new Set();
+        const uniqueJudges = new Set();
+        const uniqueGhpeda = new Set(); // ΝΕΟ: Set για τα γήπεδα
+        const uniqueTeams = new Set(); // ΝΕΟ: Set για τις ομάδες
+
+
+        function drawchart() {
+            drawDiorganvseis();
+        };
+
+        function drawDiorganvseis() {
+            let queryString;
+            let strQueryForURI;
+
+            // 1. Πάρε τη σημερινή ημερομηνία
+            const today = new Date();
+            // 2. Μορφοποίησε τη σημερινή ημερομηνία σε YYYY-MM-dd
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0'); // getMonth() είναι 0-indexed, οπότε +1
+            const day = String(today.getDate()).padStart(2, '0');
+
+            const formattedDate = `${year}-${month}-${day}`; // Παράδειγμα: "2025-06-10"
+            // 3. Δημιούργησε τη συμβολοσειρά του QUERY
+            strQueryForURI = `select * where D = date '${formattedDate}' order by D,B,A,E`;
+
+            //--- console.log(strQueryForURI);
+
+            queryString = encodeURIComponent(strQueryForURI);
+            // Replace with your actual Google Sheet ID
+            let query = new google.visualization.Query('https://docs.google.com/spreadsheets/d/17qZ43Fd2oYEV_lESKjOrqIOMurNDg5prJkyFuUH4aJA/gviz/tq?gid=6&headers=1&tq=' + queryString);
+
+            query.send(handle_DrawDiorganvseis_DataQueryResponse);
+        }
+
+        function handle_DrawDiorganvseis_DataQueryResponse(response) {
+
+
+            // Αναφορά στο loading spinner
+            const orismoiContainer = document.getElementById('pills-orismoi-container-id');
+            const toggleOrismoiDetails = document.getElementById('toggleOrismoiDetails'); // Αναφορά στο διακόπτη
+            const loadingSpinner = document.getElementById('loadingSpinner'); // Αναφορά στο loading spinner
+            // ΝΕΟ: Αναφορά στα κουμπιά export PDF
+            const exportPdfButtonHtml = document.getElementById('exportPdfButtonHtml');
+
+
+            // 1. Εμφάνιση loading spinner στην αρχή
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'block';
+            }
+            // 2. Απόκρυψη του container αγώνων μέχρι να φορτώσουν
+            if (orismoiContainer) {
+                orismoiContainer.style.display = 'none';
+            }
+            // ΝΕΟ: Απόκρυψη κουμπιών PDF μέχρι να φορτώσουν
+            if (exportPdfButtonHtml) {
+                exportPdfButtonHtml.style.display = 'none';
+            }
+
+
+            //------ ΚΕΝΤΡΙΚΟΣ ΣΗΜΕΙΟ ΔΙΑΒΑΖΕΙ DATA
+            if (response.isError()) {
+                alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+                return;
+            }
+            data = response.getDataTable(); // Assign to global 'data'
+            posesEggrafes = data.getNumberOfRows(); // Assign to global 'posesEggrafes'
+
+            // Global variables for tab state (moved here from inside functions)
+            let curOmilosKathgoria_prg = "";
+            let curAgvnistikh_prg = "";
+            let curOmilosKathgoria_orismoi = "";
+            let curAgvnistikh_orismoi = "";
+
+            //--- trexei orismous mia fora arxika και γεμίζει antistoixo tab
+            document.getElementById('pills-orismoi').classList.add('active');
+            document.getElementById('pills-orismoi').classList.add('show');
+            renderOrismoi('pills-orismoi-container-id');
+
+
+            // Συμπληρώστε τα dropdowns αφού έχουν δημιουργηθεί όλα τα στοιχεία των αγώνων
+            populateFilterDropdowns();
+
+
+            // Προσθέστε event listeners στα dropdowns, ώστε να καλείται η handleExclusiveFilterChange() κάθε φορά που αλλάζει η επιλογή
+            document.getElementById('refereeFilter').addEventListener('change', handleExclusiveFilterChange);
+            document.getElementById('commissionerFilter').addEventListener('change', handleExclusiveFilterChange);
+            document.getElementById('judgeFilter').addEventListener('change', handleExclusiveFilterChange);
+            document.getElementById('ghpedoFilter').addEventListener('change', handleExclusiveFilterChange); // ΝΕΟ: Listener για γήπεδο
+            document.getElementById('teamFilter').addEventListener('change', handleExclusiveFilterChange);     // ΝΕΟ: Listener για ομάδα
+            // Προσθέστε event listener στον διακόπτη ορατότητας
+            toggleOrismoiDetails.addEventListener('change',handleExclusiveFilterChange);
+            document.getElementById('exportPdfButtonHtml').addEventListener('click', exportMatchesToPdfHtml);
+            
+            // Εφαρμόστε τα φίλτρα στην αρχική φόρτωση (ώστε να εμφανίζονται όλα)
+            applyFilters();
+
+            // 3. Απόκρυψη loading spinner μετά την εμφάνιση των αγώνων/ορισμών
+                if (loadingSpinner) {
+                    loadingSpinner.style.display = 'none';
+                }
+                // 4. Εμφάνιση του container αγώνων
+                if (orismoiContainer) {
+                    orismoiContainer.style.display = 'block'; // Or '' if it's default is block/flex/grid
+                }
+                // ΝΕΟ: Εμφάνιση κουμπιών PDF μετά την φόρτωση
+                if (exportPdfButtonHtml) {
+                    exportPdfButtonHtml.style.display = 'block';
+                }
+              
+
+        }   //--- END of function handle_DrawDiorganvseis_DataQueryResponse(response)
+
+
+        // --- Συνάρτηση για τη δημιουργία αγώνων με ΟΡΙΣΜΟΥΣ (για το tab 'ΟΡΙΣΜΟΙ') ---
+        function renderOrismoi(parentElementId) {
+
+                const parentElement = document.getElementById(parentElementId);
+
+                if (!parentElement) {
+                    console.error(`Το γονικό στοιχείο με ID '${parentElementId}' δεν βρέθηκε.`);
+                    return;
+                }
+                // Καθαρίζουμε το περιεχόμενο πριν προσθέσουμε νέα στοιχεία
+                parentElement.innerHTML = '';
+
+
+                // Επαναφέρουμε τις μεταβλητές κατάστασης για αυτό το tab
+                curOmilosKathgoria_orismoi = "";
+                curAgvnistikh_orismoi = "";
+
+
+                for (let row = 0; row < posesEggrafes; row++) {
+
+                    // metablhth gia to όταν υπάρχει ΡΕΠΟ σε μια ομάδα να μην εμφανίζονται οι διαιτητές - Κριτές κλπα
+                    var isRepo=false;
+
+
+                    // --- Στοιχεία Κατηγορίας/Ομίλου ---
+                    if (curOmilosKathgoria_orismoi !== data.getFormattedValue(row, 0)) {
+                        curOmilosKathgoria_orismoi = data.getFormattedValue(row, 0);
+
+                        let iDivOmilos = document.createElement('div');
+                        iDivOmilos.id = 'omilos-kathgorias-orismoi-div-' + row;
+                        iDivOmilos.innerHTML = '<div class="col">' + data.getFormattedValue(row, 0) + '</div>';
+                        iDivOmilos.className = 'row MatchcenterHomepageOmilos__header';
+                        parentElement.appendChild(iDivOmilos);
+                    }
+
+                    // --- Στοιχεία Αγωνιστικής ---
+                    if (curAgvnistikh_orismoi !== data.getFormattedValue(row, 1)) {
+                        curAgvnistikh_orismoi = data.getFormattedValue(row, 1);
+
+                        let iDivAgvnistikh = document.createElement('div');
+                        iDivAgvnistikh.id = 'agvnistikh-omiloy-orismoi-div-' + row;
+                        iDivAgvnistikh.innerHTML = '<div class="col"> ΑΓΩΝΙΣΤΙΚΗ : ' + data.getFormattedValue(row, 1) + '</div>';
+                        iDivAgvnistikh.className = 'row MatchList__subtitle';
+                        parentElement.appendChild(iDivAgvnistikh);
+                    }
+
+                   // --- Αγώνας ---
+                    //--- για την ΗΜΕΡΟΜΗΝΙΑ ή την ένδειξη κατάστασης του αγώνα
+                    // ΣΕΝΑΡΙΟ : Το data.getValue(row, 3) φέρνει μόνο Ημερομηνία και ο Χρόνος είναι σε άλλο πεδίο (π.χ. data.getValue(row, 4))
+                    
+                        const matchDateString = data.getValue(row, 3); // π.χ. "13/06/2025"
+                        const matchTimeString = data.getValue(row, 4); // π.χ. "18.00"
+
+                        let matchStartDateTime;
+
+                        // Πρώτα μετατρέπουμε τη συμβολοσειρά ημερομηνίας "DD/MM/YYYY" σε "YYYY-MM-DD"
+                        if (typeof matchDateString === 'string' && matchDateString.includes('/')) {
+                            const parts = matchDateString.split('/'); // Διαχωρίζουμε την ημερομηνία: ["13", "06", "2025"]
+                            // Ελέγχουμε αν έχουμε 3 μέρη για να αποφύγουμε σφάλματα
+                            if (parts.length === 3) {
+                                // Αναδιατάσσουμε σε "YYYY-MM-DD"
+                                const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+                                // Μετατρέπουμε την ώρα "hh.mm" σε "hh:mm"
+                                const formattedTime = matchTimeString.replace('.', ':');
+
+                                // Δημιουργούμε το τελικό Date αντικείμενο
+                                matchStartDateTime = new Date(`${formattedDate}T${formattedTime}:00`);
+                            } else {
+                                console.warn(`Unexpected date format: ${matchDateString}`);
+                                matchStartDateTime = null; // Mark as invalid
+                            }
+                        } else {
+                            // Αν δεν είναι string ή δεν περιέχει '/', προσπαθούμε να το χειριστούμε ως Date object απευθείας
+                            // ή ως άλλη μορφή συμβολοσειράς που μπορεί να είναι έγκυρη
+                            try {
+                                matchStartDateTime = new Date(matchDateString);
+                                if (matchTimeString) { // Αν υπάρχει και ώρα, προσθέτουμε την ώρα
+                                const [hours, minutes] = matchTimeString.replace('.', ':').split(':').map(Number);
+                                matchStartDateTime.setHours(hours, minutes, 0, 0);
+                                }
+                            } catch (e) {
+                                console.error(`Error parsing date: ${matchDateString}`, e);
+                                matchStartDateTime = null;
+                            }
+                        }
+                    //--- END ΣΕΝΑΡΙΟ METATROPHS και συνθεσης DateTime
+
+                    // --- ΕΛΕΓΧΟΣ ΓΙΑ ΚΟΚΚΙΝΗ ΩΡΑ ---
+                    let timeClass = 'MatchListItem__time'; // Η default κλάση
+                    if (matchStartDateTime && !isNaN(matchStartDateTime.getTime())) { // Βεβαιωθείτε ότι η ημερομηνία είναι έγκυρη
+                        const now = new Date(); // Η τρέχουσα ώρα
+                        const twoHoursAfterStart = new Date(matchStartDateTime.getTime() + (2 * 60 * 60 * 1000)); // Ώρα έναρξης + 2 ώρες
+
+                        // Ελέγχουμε αν η τρέχουσα ώρα είναι ΜΕΤΑ την ώρα έναρξης
+                        // ΚΑΙ η τρέχουσα ώρα είναι ΠΡΙΝ από 2 ώρες μετά την ώρα έναρξης
+                        if (now >= matchStartDateTime && now < twoHoursAfterStart) {
+                            timeClass += ' highlight-time'; // Προσθέτουμε την κλάση για κόκκινο χρώμα
+                            //-- *** την timeClass θα την χρησιμοποιήσουμε παρακάτω στο σημείο όπου αποτυπώνεται ο χρόνος
+                        }
+                    }                    
+
+
+                    const dateObject = data.getValue(row, 3);
+                    let formattedDate = "N/A";
+                    if (dateObject instanceof Date && !isNaN(dateObject.getTime())) { // Ensure it's a valid Date object
+                        const greekMonthsAbbr = [
+                            "ΙΑΝ", "ΦΕΒ", "ΜΑΡ", "ΑΠΡ", "ΜΑΪ", "ΙΟΥΝ",
+                            "ΙΟΥΛ", "ΑΥΓ", "ΣΕΠ", "ΟΚΤ", "ΝΟΕ", "ΔΕΚ"
+                        ];
+                        const day = dateObject.getDate();
+                        const monthAbbr = greekMonthsAbbr[dateObject.getMonth()];
+                        formattedDate = `${day} ${monthAbbr}`;
+                    }
+
+
+                    //----- iDivAgvnas 
+                    let iDivAgvnas = document.createElement('div');
+                    iDivAgvnas.id = 'agvnas-prg-div-' + row;
+                    iDivAgvnas.className = 'row MatchListItem__wrapper MatchList__match';
+                    iDivAgvnas.classList.add('MatchListItem'); // Προσθέστε μια κλάση για να το αναγνωρίσετε εύκολα
+
+
+                    // --- Συλλογή Ονομάτων και Αποθήκευση σε Data Attributes ---
+                    const teamAValue = data.getFormattedValue(row, 6);
+                    const teamBValue = data.getFormattedValue(row, 7);
+                    const statusValue = data.getFormattedValue(row, 2);
+
+                    // Ανάκτηση ονομάτων από τις στήλες (προσαρμόστε τους δείκτες στηλών σας)
+                    const diaititis1 = data.getFormattedValue(row, 10);
+                    const diaititis2 = data.getFormattedValue(row, 11);
+                    const diaititis3 = data.getFormattedValue(row, 12);
+                    const komisariosValue = data.getFormattedValue(row, 55); // Στήλη Κομισάριου
+                    const kritis1 = data.getFormattedValue(row, 13);
+                    const kritis2 = data.getFormattedValue(row, 14);
+                    const kritis3 = data.getFormattedValue(row, 15);
+                    const ghpedoValue = data.getFormattedValue(row, 5); // ΝΕΟ: Τιμή γήπεδου
+                    
+
+                    // Φιλτράρουμε τα κενά/null/undefined ονόματα για να μην τα συμπεριλάβουμε
+                    const currentReferees = [diaititis1, diaititis2, diaititis3].filter(Boolean);
+                    const currentCommissioners = [komisariosValue].filter(Boolean);
+                    const currentJudges = [kritis1, kritis2, kritis3].filter(Boolean);
+                    const currentGhpedo = ghpedoValue; // ΝΕΟ
+                    const currentTeams = [teamAValue, teamBValue].filter(Boolean); // ΝΕΟ: Συλλέγουμε και τις δύο ομάδες
+                    
+
+                    // Αποθηκεύουμε τα ονόματα ως data attributes για να τα διαβάσουμε κατά το φιλτράρισμα.
+                    // Χρησιμοποιούμε join(',') για να δημιουργήσουμε μια συμβολοσειρά από πίνακες.
+                    iDivAgvnas.dataset.referees = currentReferees.join(',');
+                    iDivAgvnas.dataset.commissioner = currentCommissioners.join(',');
+                    iDivAgvnas.dataset.judges = currentJudges.join(',');
+                    iDivAgvnas.dataset.ghpedo = currentGhpedo; // ΝΕΟ: Data attribute για το γήπεδο
+                    iDivAgvnas.dataset.teams = currentTeams.join(','); // ΝΕΟ: Data attribute για τις ομάδες
+
+
+                    ///--- MONADIKOPOIH ONOMATA sta SET uniqueReferees
+                    // Προσθέτουμε τα ονόματα στα Set (τα έχουμε δηλώσει στην αρχη αρχή uniqueReferees ) για να πάρουμε μοναδικές τιμές για τα dropdowns
+                    currentReferees.forEach(name => uniqueReferees.add(name));
+                    currentCommissioners.forEach(name => uniqueCommissioners.add(name));
+                    currentJudges.forEach(name => uniqueJudges.add(name));
+                    if (currentGhpedo) uniqueGhpeda.add(currentGhpedo); // ΝΕΟ: Προσθήκη γηπέδου στο set
+                    currentTeams.forEach(name => uniqueTeams.add(name)); // ΝΕΟ: Προσθήκη ομάδων στο set
+
+
+                  //  console.log("uniqueReferees = " + Array.from(uniqueReferees));
+                  //  console.log("uniqueCommissioners = " + Array.from(uniqueCommissioners));
+                  //  console.log("uniqueJudges = " + Array.from(uniqueJudges));
+                  //  console.log("uniqueGhpeda = " + Array.from(uniqueGhpeda)); // ΝΕΟ
+                  //  console.log("uniqueTeams = " + Array.from(uniqueTeams));   // ΝΕΟ
+
+
+
+                    //--- για την ΩΡΑ ή την ένδειξη κατάστασης του αγώνα
+                    if (teamAValue === "-" || teamBValue === "-") {
+                        iDivAgvnas.innerHTML = '<div class="col MatchListItem__header"><span class="MatchListItem__date">' + formattedDate + '</span> <span class="MatchListItem__time">Ρ Ε Π Ο </span></div>';
+                        isRepo=true
+                    } else if (statusValue === "ΤΕΛΙΚΟ") {
+                        iDivAgvnas.innerHTML = '<div class="col MatchListItem__header"><span class="MatchListItem__date"> ΤΕΛΙΚΟ </span> </div>';
+                    } else if (statusValue === "ΑΑ") {
+                        iDivAgvnas.innerHTML = '<div class="col MatchListItem__header"><span class="MatchListItem__date"> ΑΑ </span> </div>';
+                    } else {
+                        iDivAgvnas.innerHTML = '<div class="col MatchListItem__header"><span class="MatchListItem__date">' + formattedDate + '</span> <span class="'+ timeClass +'"> ' + data.getFormattedValue(row, 4) + '</span></div>';
+                    }
+                    parentElement.appendChild(iDivAgvnas);
+
+
+                 // --- λογοτυπα Ομάδες και Σκορ Αγώνα ---]
+
+                    let matchContentDiv = document.createElement('div');
+                    matchContentDiv.classList.add('MatchListItem__content');
+
+                    //---- ghpedo panv apo omada A
+                    if(!isRepo){                    
+                        let ghpedoDiv = document.createElement('div');
+                        ghpedoDiv.classList.add('MatchListItem__Ghpedo');
+
+                        let ghpedoNameSpan = document.createElement('span');
+                        ghpedoNameSpan.classList.add('MatchListItem__ghpedoName');
+                        ghpedoNameSpan.textContent = ghpedoValue; // Χρησιμοποιούμε τη συλλεγμένη τιμή
+
+                        ghpedoDiv.appendChild(ghpedoNameSpan);
+                        matchContentDiv.appendChild(ghpedoDiv);
+                    }
+                                        
+                    //---- omada A + omada B
+
+                    let homeTeamDiv = document.createElement('div');
+                    homeTeamDiv.classList.add('MatchListItem__team', 'MatchListItem__team--home');
+
+                    // --- ΛΟΓΟΤΥΠΟ ΓΗΠΕΔΟΥΧΟΥ ---
+                    const homeLogoUrl = data.getFormattedValue(row, 53); // URL λογότυπου γηπεδούχου
+                    if (homeLogoUrl) {
+                        let homeLogoDiv = document.createElement('div');
+                        homeLogoDiv.classList.add('MatchListItem__teamLogo'); // Προσθέτουμε νέα κλάση για styling
+                        homeLogoDiv.style.backgroundImage = `url('${homeLogoUrl}')`;
+                        // Προσθέτουμε στυλ για να διασφαλίσουμε ότι το λογότυπο εμφανίζεται σωστά
+                        // Μπορείτε να ρυθμίσετε το μέγεθος (π.χ. 20px) ανάλογα με το ύψος της γραμματοσειράς
+                        homeLogoDiv.style.width = '20px';  // Σταθερό πλάτος
+                        homeLogoDiv.style.height = '20px'; // Σταθερό ύψος, ίσο με το ύψος της γραμματοσειράς
+                        homeLogoDiv.style.backgroundSize = 'contain'; // Το λογότυπο θα χωράει μέσα στο div
+                        homeLogoDiv.style.backgroundRepeat = 'no-repeat'; // Όχι επανάληψη εικόνας
+                        homeLogoDiv.style.backgroundPosition = 'center'; // Κεντράρισμα εικόνας
+                        homeLogoDiv.style.marginRight = '8px'; // Απόσταση από το όνομα της ομάδας
+                        homeTeamDiv.appendChild(homeLogoDiv); // Προσθέτουμε το λογότυπο πριν το όνομα
+                    }
+
+                    let homeTeamNameSpan = document.createElement('span');
+                    homeTeamNameSpan.classList.add('MatchListItem__teamName');
+                    homeTeamNameSpan.textContent = teamAValue; // Χρησιμοποιούμε τη συλλεγμένη τιμή
+
+                    let homeTeamScoreSpan = document.createElement('span');
+                    homeTeamScoreSpan.classList.add('MatchListItem__teamScore');
+                    const homeScore = parseFloat(data.getFormattedValue(row, 8)); // Μετατροπή σε αριθμό
+                    homeTeamScoreSpan.textContent = isNaN(homeScore) ? '' : homeScore; // Εμφάνιση παύλας αν δεν είναι αριθμός
+
+                    homeTeamDiv.appendChild(homeTeamNameSpan);
+                    homeTeamDiv.appendChild(homeTeamScoreSpan);
+
+                    let awayTeamDiv = document.createElement('div');
+                    awayTeamDiv.classList.add('MatchListItem__team', 'MatchListItem__team--away');
+
+                    // --- ΛΟΓΟΤΥΠΟ ΦΙΛΟΞΕΝΟΥΜΕΝΟΥ ---
+                    const awayLogoUrl = data.getFormattedValue(row, 54); // URL λογότυπου φιλοξενούμενου
+                    if (awayLogoUrl) {
+                        let awayLogoDiv = document.createElement('div');
+                        awayLogoDiv.classList.add('MatchListItem__teamLogo'); // Προσθέτουμε νέα κλάση για styling
+                        awayLogoDiv.style.backgroundImage = `url('${awayLogoUrl}')`;
+                        awayLogoDiv.style.width = '20px';  // Σταθερό πλάτος
+                        awayLogoDiv.style.height = '20px'; // Σταθερό ύψος
+                        awayLogoDiv.style.backgroundSize = 'contain';
+                        awayLogoDiv.style.backgroundRepeat = 'no-repeat';
+                        awayLogoDiv.style.backgroundPosition = 'center';
+                        awayLogoDiv.style.marginRight = '8px'; // Απόσταση από το όνομα της ομάδας
+                        awayTeamDiv.appendChild(awayLogoDiv); // Προσθέτουμε το λογότυπο πριν το όνομα
+                    }
+
+                    let awayTeamNameSpan = document.createElement('span');
+                    awayTeamNameSpan.classList.add('MatchListItem__teamName');
+                    awayTeamNameSpan.textContent = teamBValue; // Χρησιμοποιούμε τη συλλεγμένη τιμή
+
+                    let awayTeamScoreSpan = document.createElement('span');
+                    awayTeamScoreSpan.classList.add('MatchListItem__teamScore');
+                    const awayScore = parseFloat(data.getFormattedValue(row, 9)); // Μετατροπή σε αριθμό
+                    awayTeamScoreSpan.textContent = isNaN(awayScore) ? '' : awayScore; // Εμφάνιση κενού αν δεν είναι αριθμός
+
+                    awayTeamDiv.appendChild(awayTeamNameSpan);
+                    awayTeamDiv.appendChild(awayTeamScoreSpan);
+
+                    matchContentDiv.appendChild(homeTeamDiv);
+                    matchContentDiv.appendChild(awayTeamDiv);
+
+                    // Έλεγχος νικητή και προσθήκη της κλάσης "MatchListItem__team--winning"
+                    if (!isNaN(homeScore) && !isNaN(awayScore)) {
+                        if (homeScore > awayScore) {
+                            homeTeamDiv.classList.add('MatchListItem__team--winning');
+                        } else if (awayScore > homeScore) {
+                            awayTeamDiv.classList.add('MatchListItem__team--winning');
+                        }
+                    }
+                    iDivAgvnas.appendChild(matchContentDiv);
+
+
+                 // --- Προσθήκη των Στοιχείων Ορισμών (Διαιτητές, Κομισάριος, Κριτές) ---
+                    let orismoiDetailsDiv = document.createElement('div');
+                    orismoiDetailsDiv.classList.add('MatchListItem__orismoi-details');
+
+                    // Create a new Bootstrap row to hold the three columns
+                    let orismoiRow = document.createElement('div');
+                    orismoiRow.classList.add('row', 'g-3'); // 'g-3' adds some gutter spacing between columns
+                    if(isRepo){
+                        orismoiRow.classList.add('d-none'); // κρυβει τους ορισμους σε περιπτωση ρεπό
+                    }
+
+                    // --- α. Διαιτητές (Column 1) ---
+                    let diaititesCol = document.createElement('div');
+                    diaititesCol.classList.add('col-md-4', 'col-sm-12'); // Takes 1/3 width on medium screens, full width on small
+                    
+                    let diaititesDiv = document.createElement('div');
+                    diaititesDiv.classList.add('MatchListItem__section-title');
+                    diaititesDiv.textContent = 'ΔΙΑΙΤΗΤΕΣ:';
+                    diaititesCol.appendChild(diaititesDiv);
+
+                    let diaititesList = document.createElement('ul');
+                    diaititesList.classList.add('MatchListItem__list');
+
+                    if (diaititis1) {
+                        let li1 = document.createElement('li');
+                        li1.textContent = diaititis1;
+                        diaititesList.appendChild(li1);
+                    }
+                    if (diaititis2) {
+                        let li2 = document.createElement('li');
+                        li2.textContent = diaititis2;
+                        diaititesList.appendChild(li2);
+                    }
+                    if (diaititis3) {
+                        let li3 = document.createElement('li');
+                        li3.textContent = diaititis3;
+                        diaititesList.appendChild(li3);
+                    }
+                    if (!diaititis1 && !diaititis2 && !diaititis3) {
+                        let li = document.createElement('li');
+                        //-- li.textContent = "Δεν έχουν οριστεί"΄
+                        li.innerHTML = " &empty;";
+                        diaititesList.appendChild(li);
+                    }
+                    diaititesCol.appendChild(diaititesList); // Append diaititesList to its column
+                    orismoiRow.appendChild(diaititesCol);    // Append diaititesCol to the row
+
+                    // --- β. Κομισάριος (Column 2) ---
+                    let komisariosCol = document.createElement('div');
+                    komisariosCol.classList.add('col-md-4', 'col-sm-12', 'komisarios-column-to-hide');
+
+                    let komisariosDiv = document.createElement('div');
+                    komisariosDiv.classList.add('MatchListItem__section-title');
+                    komisariosDiv.textContent = 'ΚΟΜΙΣΑΡΙΟΣ:';
+                    komisariosCol.appendChild(komisariosDiv);
+
+                    if (komisariosValue) {
+                        let pKomisarios = document.createElement('p');
+                        pKomisarios.classList.add('MatchListItem__single-value');
+                        pKomisarios.textContent = komisariosValue;
+                        komisariosCol.appendChild(pKomisarios);
+                    } else {
+                        let pKomisarios = document.createElement('p');
+                        pKomisarios.classList.add('MatchListItem__single-value');
+                        pKomisarios.innerHTML = "&empty;";
+                        //-- pKomisarios.textContent = "Δεν έχει οριστεί";
+                        komisariosCol.appendChild(pKomisarios);
+                        komisariosCol.classList.add('invisible');
+                    }
+                    orismoiRow.appendChild(komisariosCol); // Append komisariosCol to the row
+
+                    // --- γ. Κριτές (Column 3) ---
+                    let kritesCol = document.createElement('div');
+                    kritesCol.classList.add('col-md-4', 'col-sm-12');
+
+                    let kritesDiv = document.createElement('div');
+                    kritesDiv.classList.add('MatchListItem__section-title');
+                    kritesDiv.textContent = 'ΚΡΙΤΕΣ:';
+                    kritesCol.appendChild(kritesDiv);
+
+                    let kritesList = document.createElement('ul');
+                    kritesList.classList.add('MatchListItem__list');
+
+
+                    if (kritis1) {
+                        let liKritis1 = document.createElement('li');
+                        liKritis1.textContent = kritis1;
+                        kritesList.appendChild(liKritis1);
+                    }
+                    if (kritis2) {
+                        let liKritis2 = document.createElement('li');
+                        liKritis2.textContent = kritis2;
+                        kritesList.appendChild(liKritis2);
+                    }
+                    if (kritis3) {
+                        let liKritis3 = document.createElement('li');
+                        liKritis3.textContent = kritis3;
+                        kritesList.appendChild(liKritis3);
+                    }
+                    if (!kritis1 && !kritis2 && !kritis3) {
+                        let li = document.createElement('li');
+                        // li.textContent = "Δεν έχουν οριστεί";
+                        li.innerHTML = "&empty;";
+
+                        kritesList.appendChild(li);
+                    }
+                    kritesCol.appendChild(kritesList); // Append kritesList to its column
+                    orismoiRow.appendChild(kritesCol);   // Append kritesCol to the row
+
+                    // Append the new row containing the three columns to orismoiDetailsDiv
+                    orismoiDetailsDiv.appendChild(orismoiRow);
+
+                    // Προσθήκη του νέου div ορισμών κάτω από το matchContentDiv
+                    iDivAgvnas.appendChild(orismoiDetailsDiv);
+
+                    // Προσθέτουμε το δημιουργημένο στοιχείο στον global πίνακα για φιλτράρισμα
+                    allMatchDefinitionItems.push(iDivAgvnas);
+                }
+
+            // ΝΕΟ ΚΩΔΙΚΑΣ ΕΔΩ: Προσθήκη της ένδειξης στο τέλος
+            const ekasthDiv = document.createElement('div');
+            ekasthDiv.classList.add('ekasth-footer-text', 'text-center', 'mt-3', 'mb-3'); // Προσθέτουμε κλάσεις για στυλ και κεντράρισμα
+
+            // Δημιουργία της τρέχουσας ημερομηνίας και ώρας
+            const now = new Date();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const year = now.getFullYear();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+
+            const formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+
+            ekasthDiv.textContent = `Ε.ΚΑ.Σ.Θ. 1976 - ${formattedDateTime}`;
+
+            parentElement.appendChild(ekasthDiv);
+
+            
+            const versionDiv = document.createElement('div');
+            versionDiv.classList.add('ekasth-footer-version-text', 'text-center', 'mt-0', 'mb-0'); // Προσθέτουμε κλάσεις για στυλ και κεντράρισμα
+            versionDiv.textContent =`LT v.25.06.14 | today-matchcenter@myekasth`;
+            parentElement.appendChild(versionDiv);
+
+            //*** END ΝΕΟ ΚΩΔΙΚΑΣ ΕΔΩ: Προσθήκη της ένδειξης στο τέλος
+
+
+
+        }
+
+        /**
+         * Συμπληρώνει τα dropdown φίλτρα με μοναδικά ονόματα.
+         */
+        function populateFilterDropdowns() {
+            const refereeSelect = document.getElementById('refereeFilter');
+            const commissionerSelect = document.getElementById('commissionerFilter');
+            const judgeSelect = document.getElementById('judgeFilter');
+            const ghpedoSelect = document.getElementById('ghpedoFilter'); // ΝΕΟ
+            const teamSelect = document.getElementById('teamFilter');     // ΝΕΟ
+
+            // Βοηθητική συνάρτηση για συμπλήρωση ενός dropdown
+            const populateSelect = (selectElement, namesSet) => {
+                // Καθαρίζουμε τις προηγούμενες επιλογές (εκτός από το "Όλα")
+                selectElement.innerHTML = '<option value="Όλα">Όλα</option>';
+                // Ταξινομούμε τα ονόματα αλφαβητικά πριν τα προσθέσουμε
+                const sortedNames = Array.from(namesSet).sort((a, b) => a.localeCompare(b, 'el', { sensitivity: 'base' }));
+                sortedNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    selectElement.appendChild(option);
+                });
+            };
+
+            populateSelect(refereeSelect, uniqueReferees);
+            populateSelect(commissionerSelect, uniqueCommissioners);
+            populateSelect(judgeSelect, uniqueJudges);
+            populateSelect(ghpedoSelect, uniqueGhpeda); // ΝΕΟ
+            populateSelect(teamSelect, uniqueTeams);     // ΝΕΟ
+        }
+
+        /**
+         * Εφαρμόζει τα επιλεγμένα φίλτρα στα στοιχεία των αγώνων.
+         */
+        function applyFilters() {
+            const refereeSelect = document.getElementById('refereeFilter');
+            const commissionerSelect = document.getElementById('commissionerFilter');
+            const judgeSelect = document.getElementById('judgeFilter');
+            const ghpedoSelect = document.getElementById('ghpedoFilter'); // ΝΕΟ
+            const teamSelect = document.getElementById('teamFilter');     // ΝΕΟ
+
+            const selectedReferee = refereeSelect.value;
+            const selectedCommissioner = commissionerSelect.value;
+            const selectedJudge = judgeSelect.value;
+            const selectedGhpedo = ghpedoSelect.value; // ΝΕΟ
+            const selectedTeam = teamSelect.value;     // ΝΕΟ
+
+            const toggleOrismoiDetails = document.getElementById('toggleOrismoiDetails');
+            // ΝΕΟ: Ανάκτηση της κατάστασης του διακόπτη ορατότητας ορισμών
+            const showOrismoiDetails = toggleOrismoiDetails.checked;
+
+            // ΝΕΟ: Αναφορά στο div των φίλτρων
+            const filterSectionDiv = document.querySelector('.filter-section');
+
+            // ΝΕΟ: Χειρισμός ορατότητας του filter-section div
+            if (filterSectionDiv) {
+                filterSectionDiv.style.display = showOrismoiDetails ? '' : 'none';
+            }
+
+            // ΝΕΟ: Αν ο διακόπτης Ορισμών ΔΕΝ είναι επιλεγμένος, επαναφέρουμε τα φίλτρα στο "Όλα"
+            if (!showOrismoiDetails) {
+                refereeSelect.value = 'Όλα';
+                commissionerSelect.value = 'Όλα';
+                judgeSelect.value = 'Όλα';
+                ghpedoSelect.value = 'Όλα'; // ΝΕΟ
+                teamSelect.value = 'Όλα';     // ΝΕΟ
+                // Προαιρετικά: Μπορείτε να απενεργοποιήσετε τα dropdowns αν είναι κρυμμένα
+                refereeSelect.disabled = true;
+                commissionerSelect.disabled = true;
+                judgeSelect.disabled = true;
+                ghpedoSelect.disabled = true; // ΝΕΟ
+                teamSelect.disabled = true;     // ΝΕΟ
+            } else {
+                // Ενεργοποιούμε τα dropdowns αν ο διακόπτης είναι επιλεγμένος
+                refereeSelect.disabled = false;
+                commissionerSelect.disabled = false;
+                judgeSelect.disabled = false;
+                ghpedoSelect.disabled = false; // ΝΕΟ
+                teamSelect.disabled = false;     // ΝΕΟ
+            }
+
+
+            allMatchDefinitionItems.forEach(matchItem => {
+                // Διαβάζουμε τα data attributes. Χρησιμοποιούμε split(',') για να τα κάνουμε πάλαι πίνακες.
+                // Το filter(Boolean) αφαιρεί τυχόν κενά strings αν το data attribute ήταν άδειο.
+                const referees = matchItem.dataset.referees ? matchItem.dataset.referees.split(',').filter(Boolean) : [];
+                const commissioner = matchItem.dataset.commissioner || '';
+                const judges = matchItem.dataset.judges ? matchItem.dataset.judges.split(',').filter(Boolean) : [];
+                const ghpedo = matchItem.dataset.ghpedo || ''; // ΝΕΟ
+                const teams = matchItem.dataset.teams ? matchItem.dataset.teams.split(',').filter(Boolean) : []; // ΝΕΟ
+
+                // Έλεγχος για κάθε φίλτρο:
+                // Αν η επιλογή είναι "Όλα", τότε το φίλτρο ταιριάζει πάντα.
+                // Αλλιώς, ελέγχουμε αν το όνομα περιέχεται στον αντίστοιχο πίνακα (για διαιτητές/κριτές/ομάδες)
+                // ή αν ταιριάζει ακριβώς (για κομισάριο/γήπεδο).
+                const refereeMatch = (selectedReferee === 'Όλα') || referees.includes(selectedReferee);
+                const commissionerMatch = (selectedCommissioner === 'Όλα') || commissioner === selectedCommissioner;
+                const judgeMatch = (selectedJudge === 'Όλα') || judges.includes(selectedJudge);
+                const ghpedoMatch = (selectedGhpedo === 'Όλα') || ghpedo === selectedGhpedo; // ΝΕΟ
+                const teamMatch = (selectedTeam === 'Όλα') || teams.includes(selectedTeam); // ΝΕΟ
+
+                // Ένας αγώνας εμφανίζεται μόνο αν ΟΛΑ τα φίλτρα ταιριάζουν (λογική AND)
+                const shouldShowBasedOnFilters = refereeMatch && commissionerMatch && judgeMatch && ghpedoMatch && teamMatch; // ΝΕΟ: Προσθήκη νέων φίλτρων
+
+                // Εφαρμόζουμε την ορατότητα με βάση τα φίλτρα αγώνων
+                matchItem.style.display = shouldShowBasedOnFilters ? '' : 'none';
+
+                // Χειρισμός ορατότητας του τμήματος ορισμών μέσα στον αγώνα (ανά MatchListItem)
+                const orismoiDetailsDiv = matchItem.querySelector('.MatchListItem__orismoi-details');
+                if (orismoiDetailsDiv) {
+                    orismoiDetailsDiv.style.display = showOrismoiDetails ? '' : 'none';
+                }
+            });
+        }
+
+        /**
+         * Χειρίζεται την αλλαγή σε ένα φίλτρο, επαναφέροντας τα άλλα φίλτρα στο "Όλα"
+         * και στη συνέχεια εφαρμόζει τα φίλτρα.
+         * @param {Event} event - Το event αντικείμενο από την αλλαγή του dropdown.
+         */
+        function handleExclusiveFilterChange(event) {
+            const changedFilterId = event.target.id; // Το ID του dropdown που άλλαξε
+
+            const refereeSelect = document.getElementById('refereeFilter');
+            const commissionerSelect = document.getElementById('commissionerFilter');
+            const judgeSelect = document.getElementById('judgeFilter');
+            const ghpedoSelect = document.getElementById('ghpedoFilter'); // ΝΕΟ
+            const teamSelect = document.getElementById('teamFilter');     // ΝΕΟ
+
+            // Επαναφέρουμε τα άλλα dropdowns στο "Όλα"
+            if (changedFilterId === 'refereeFilter') {
+                commissionerSelect.value = 'Όλα';
+                judgeSelect.value = 'Όλα';
+                ghpedoSelect.value = 'Όλα'; // ΝΕΟ
+                teamSelect.value = 'Όλα';     // ΝΕΟ
+            } else if (changedFilterId === 'commissionerFilter') {
+                refereeSelect.value = 'Όλα';
+                judgeSelect.value = 'Όλα';
+                ghpedoSelect.value = 'Όλα'; // ΝΕΟ
+                teamSelect.value = 'Όλα';     // ΝΕΟ
+            } else if (changedFilterId === 'judgeFilter') {
+                refereeSelect.value = 'Όλα';
+                commissionerSelect.value = 'Όλα';
+                ghpedoSelect.value = 'Όλα'; // ΝΕΟ
+                teamSelect.value = 'Όλα';     // ΝΕΟ
+            } else if (changedFilterId === 'ghpedoFilter') { // ΝΕΟ
+                refereeSelect.value = 'Όλα';
+                commissionerSelect.value = 'Όλα';
+                judgeSelect.value = 'Όλα';
+                teamSelect.value = 'Όλα';
+            } else if (changedFilterId === 'teamFilter') { // ΝΕΟ
+                refereeSelect.value = 'Όλα';
+                commissionerSelect.value = 'Όλα';
+                judgeSelect.value = 'Όλα';
+                ghpedoSelect.value = 'Όλα';
+            }
+
+            const toggleOrismoiDetailsCheckbox = document.getElementById('toggleOrismoiDetails');
+            if( toggleOrismoiDetailsCheckbox.checked ){                              
+            }else{
+                commissionerSelect.value = 'Όλα';
+                refereeSelect.value = 'Όλα';
+                judgeSelect.value = 'Όλα';  
+                ghpedoSelect.value = 'Όλα'; // ΝΕΟ
+                teamSelect.value = 'Όλα';     // ΝΕΟ
+            }
+
+           // toggleOrismoiDetails.addEventListener('change',handleExclusiveFilterChange);
+
+
+            // Τώρα εφαρμόζουμε τα φίλτρα με τη νέα κατάσταση
+            applyFilters();
+        }        
+        // Λειτουργία: Εξαγωγή PDF από HTML (υπάρχουσα)
+        async function exportMatchesToPdfHtml() {
+            // Κρύβουμε προσωρινά στοιχεία που δεν θέλουμε να εμφανιστούν στο PDF
+            const filterSection = document.querySelector('.filter-section');
+            const toggleSwitch = document.querySelector('.custom-toggle-container');
+            const exportPdfButtonHtml = document.getElementById('exportPdfButtonHtml');
+
+            if (filterSection) filterSection.style.display = 'none';
+            if (toggleSwitch) toggleSwitch.style.display = 'none';
+            if (exportPdfButtonHtml) exportPdfButtonHtml.style.display = 'none';
+
+
+            const element = document.getElementById('pills-orismoi-container-id'); // Το div που περιέχει τους αγώνες
+            if (!element) {
+                alert('Δεν βρέθηκε το περιεχόμενο για εξαγωγή PDF.');
+                return;
+            }
+
+            try {
+                const canvas = await html2canvas(element, {
+                    scale: 2, // Αυξήστε την ανάλυση για καλύτερη ποιότητα PDF
+                    useCORS: true // Εάν υπάρχουν εικόνες από διαφορετικό domain
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 210; // A4 width in mm (portrait)
+                const pageHeight = 295; // A4 height in mm (portrait)
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+
+                const doc = new jspdf.jsPDF('p', 'mm', 'a4'); // 'p' for portrait, 'mm' for millimeters, 'a4' for A4 size
+                let position = 0;
+
+                doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    doc.addPage();
+                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+                doc.save('Αγώνες_Ορισμοί_HTML.pdf');
+            } catch (error) {
+                console.error("Σφάλμα κατά τη δημιουργία PDF (HTML):", error);
+                alert("Προέκυψε σφάλμα κατά τη δημιουργία του PDF (HTML). Ελέγξτε την κονσόλα για λεπτομέρειες.");
+            } finally {
+                // Επαναφέρουμε τα κρυφά στοιχεία
+                if (filterSection) filterSection.style.display = '';
+                if (toggleSwitch) toggleSwitch.style.display = '';
+                if (exportPdfButtonHtml) exportPdfButtonHtml.style.display = 'block';
+                applyFilters(); // Επαναφορά κατάστασης φίλτρων
+            }
+        }
+
+
+
+
+    </script>
+
+    <style>
+
+        /* Γενικές ρυθμίσεις για όλο το widget αν δεν υπάρχουν ήδη */
+        .MatchcenterWidget {
+            font-family: 'Inter', sans-serif; /* Ορίζουμε την Inter ως default για το widget */
+            color: #333; /* Γενικό χρώμα κειμένου για ομοιομορφία */
+        }
+
+        .MatchcenterHomepageWidget__header {
+            color: #0f253a;
+            font-family: "Krona One", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+            letter-spacing: .12em;
+            text-align: center;
+            padding: 12px 0;
+            margin-bottom: 15px;
+            border-bottom: 5px solid #ff0040;
+        }
+
+        .MatchcenterHomepageOmilos__header {
+            background-color: #e2e4e6;
+            color: #003e5e;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: .05em;
+            padding: 5px 20px;
+            text-transform: uppercase;
+            text-align: center;
+            user-select: none;
+        }
+
+        .MatchList__subtitle {
+            border-bottom: 1px solid #e2e4e6;
+            color: #003e5e;
+            font-size: 13px;
+            letter-spacing: .05em;
+            text-align: center;
+            text-transform: uppercase;
+            padding: 6px 20px;
+            user-select: none;
+        }
+
+        .MatchListItem {
+            /* Keep if needed for other styles, but wrapper handles main display */
+        }
+
+        .MatchList__match {
+            min-height: 58px;
+        }
+
+        .MatchListItem__wrapper {
+            border-bottom: 4px solid #e2e4e6;
+            display: flex;
+            align-items: stretch;
+            justify-content: flex-start;
+            padding: 10px 0;
+            text-decoration: none;
+            flex-wrap: wrap; /* Allows wrapping for orismoi details */
+        }
+
+        .MatchListItem__wrapper:hover{
+            background-color: rgb(248, 248, 248);
+            outline: none;
+            user-select :auto;
+            cursor: pointer;            
+        }        
+
+        .MatchListItem__header {
+            display: flex;
+            flex-flow: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            width: 65px;
+            flex: 0 0 65px;
+            padding: 0 5px 0 0;
+            border-right: 1px solid #e2e4e6;
+        }
+
+        /* --- ΗΜΕΡΟΜΗΝΙΑ ΧΡΟΝΟΣ -- */
+
+        .MatchListItem__date {
+            color: #003e5e;
+            font-size: 12px;
+            text-transform: uppercase;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .MatchListItem__time,
+        .MatchListItem__year {
+            color: #003e5e;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 0.8;
+        }
+
+        .MatchListItem__time.highlight-time {
+            color: red;
+            font-weight: bold; /* Προαιρετικά, για να τονιστεί περισσότερο */
+
+            /* Animation Properties */
+            animation: gentle-blink 1.2s infinite alternate; /* Ορισμός animation */
+        }
+
+        /* Keyframes για το animation */
+        @keyframes gentle-blink {
+            0% {
+                opacity: 1; /* Πλήρης αδιαφάνεια στην αρχή */
+            }
+            100% {
+                opacity: 0.4; /* Ελαφρώς πιο αχνό στο τέλος */
+            }
+        }
+
+        /* --- ΓΗΠΕΔΟ -- */
+
+        .MatchListItem__Ghpedo{
+            margin-bottom: 5px;
+            text-align: right;
+        }
+        .MatchListItem__ghpedoName{
+            font-size: 11px;
+            font-weight: 400;
+            letter-spacing: 0.15em;
+            box-shadow: 0px 0px 4px 4px rgba(0, 0, 0, 0.08);
+        }
+
+        /* --- ΟΜΑΔΕΣ ΑΓΩΝΑ -- */
+        .MatchListItem__content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center content vertically */
+        }
+
+        .MatchListItem__team {
+            display: flex;
+            padding: 0 15px;
+        }
+
+        .MatchListItem__team--home {
+            margin-bottom: 10px;
+        }
+
+        .MatchListItem__team--away {
+            margin-bottom: 0px;
+        }
+
+        .MatchListItem__teamName {
+            margin-right: auto;
+        }
+
+
+
+        .MatchListItem__teamName,
+        .MatchListItem__teamScore {
+            color: #003e5e;
+            font-size: 12px;
+            font-weight: 400;
+            letter-spacing: .04em;
+        }
+
+        .MatchListItem__teamScore {
+            min-width: 1ch;
+            text-align: center
+        }
+
+        .MatchListItem__team--winning .MatchListItem__teamName,
+        .MatchListItem__team--winning .MatchListItem__teamScore {
+            font-weight: 700
+        }
+
+        /* --- Στυλ για την ενότητα Ορισμών --- */
+        .MatchListItem__orismoi-details {
+            flex: 1 0 100%; /* Take full width below main match content */
+            padding: 1px 15px 0 65px; /* Adjust padding to align with MatchListItem__content */
+            border-top: 1px dashed #e2e4e6; /* Separator for clarity */
+            margin-top: 2px;
+        }
+
+        .MatchListItem__section-title {
+            font-weight: bold;
+            color: #003e5e;
+            font-size: 11px;
+            margin-bottom: 1px;
+            text-transform: uppercase;
+        }
+
+        .MatchListItem__list {
+            list-style: none; /* Remove default bullet points */
+            padding: 0;
+            margin: 0;
+        }
+
+        .MatchListItem__list li {
+            font-size: 11px;
+            color: #333;
+            line-height: 1.2;
+        }
+
+        .MatchListItem__single-value {
+            font-size: 11px;
+            color: #333;
+            margin-bottom: 10px;
+            padding-left: 0;
+        }
+
+        .sticky-header-tabs {
+            position: fixed; /* Κάνει το στοιχείο να παραμένει στην οθόνη ακόμα και με scroll */
+            top: 0;          /* Κολλάει στην κορυφή του viewport */
+            width: 100%;     /* Καλύπτει όλο το πλάτος του viewport */
+            background-color: #fff; /* Ορίζουμε background-color για να μην "φαίνεται" το περιεχόμενο από κάτω */
+            z-index: 1000;   /* Διασφαλίζει ότι θα εμφανίζεται πάνω από άλλα στοιχεία */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Προαιρετικό: προσθήκη σκιάς για καλύτερη οπτική διαχωρισμό */
+        }
+
+        /* Πρέπει να προσθέσουμε padding στο περιεχόμενο για να μην κρύβεται κάτω από το fixed header */
+        .tab-content{
+            /* Δώστε padding-top ίσο ή λίγο μεγαλύτερο από το συνολικό ύψος του sticky-header-tabs */
+            padding-top: 150px; /* Προσαρμόστε αυτό το ύψος ανάλογα με το πραγματικό ύψος του header+tabs */
+        }
+
+        /* Προαιρετικά: Αν το .MatchcenterHomepageWidget έχει background-color, βεβαιωθείτε ότι το .sticky-header-tabs είναι το ίδιο ή διαφανές */
+        .MatchcenterHomepageWidget {
+            /* Εάν είχε background-color, ίσως να το αφαιρέσετε από εδώ ή να το ρυθμίσετε διαφορετικά */
+            padding-top: 0; /* Αφαιρέστε τυχόν padding-top από εδώ αν το βάλετε στο tab-content */
+        }
+        
+        /**** ΔΙΑΚΟΠΤΗΣ επιλογής ΕΜΦΑΝΙΣΗΣ ΟΡΙΣΜΩΝ ή ΜΟΝΟ ΠΡΟΓΡΑΜΜΑΤΟΣ    ***/
+
+        /* CSS for the custom switch */
+        .custom-toggle-container {
+            /* Ensures the container itself is centered by Bootstrap's text-center */
+        }
+
+        .custom-toggle-switch {
+            position: relative;
+            display: inline-flex; /* Χρησιμοποιούμε flex για να ευθυγραμμίσουμε το checkbox, το slider και το κείμενο */
+            align-items: center; /* Κεντράρει κάθετα τα στοιχεία μέσα στον διακόπτη */
+            cursor: pointer;
+            font-family: 'Inter', sans-serif; /* Ορισμός γραμματοσειράς */
+            font-size: 1.1em; /* Ελαφρώς μεγαλύτερο κείμενο για το label */
+            font-weight: 500; /* Μέτριο πάχος για καλύτερη αναγνωσιμότητα */
+            -webkit-user-select: none; /* Αποτρέπουμε την επιλογή κειμένου */
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            gap: 5px; /* Απόσταση μεταξύ slider και κειμένου 10 px αρχικο*/
+            padding: 5px 0; /* Κάποιο padding για οπτική άνεση */
+
+        }
+
+        .custom-toggle-switch input {
+            opacity: 0; /* Κρύβουμε το προεπιλεγμένο checkbox */
+            width: 0;
+            height: 0;
+        }
+
+        .custom-toggle-slider {
+            position: relative;
+            width: 60px; /* Πλάτος του slider track */
+            height: 34px; /* Ύψος του slider track */
+            background-color: #ccc; /* Προεπιλεγμένο χρώμα όταν είναι ανενεργό */
+            border-radius: 34px; /* Στρογγυλεμένες γωνίες για το track */
+            transition: background-color 0.4s; /* Ομαλή μετάβαση για το χρώμα φόντου */
+            flex-shrink: 0; /* Αποτρέπουμε το slider από το να συρρικνωθεί */
+        }
+
+        .custom-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px; /* Ύψος του "δακτύλου" (thumb) */
+            width: 26px; /* Πλάτος του "δακτύλου" */
+            left: 4px; /* Αρχική θέση του "δακτύλου" */
+            bottom: 4px; /* Αρχική θέση του "δακτύλου" */
+            background-color: white; /* Χρώμα του "δακτύλου" */
+            border-radius: 50%; /* Κάνουμε το "δάχτυλο" στρογγυλό */
+            transition: transform 0.4s; /* Ομαλή μετάβαση για την κίνηση του "δακτύλου" */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Λεπτή σκιά για 3D εφέ */
+        }
+
+        /* Όταν το checkbox είναι επιλεγμένο, αλλάζουμε το χρώμα φόντου και μετακινούμε το "δάχτυλο" */
+        .custom-toggle-switch input:checked + .custom-toggle-slider {
+            background-color: #2196F3; /* Μπλε φόντο όταν είναι ενεργό */
+        }
+
+        .custom-toggle-switch input:focus + .custom-toggle-slider {
+            box-shadow: 0 0 1px #2196F3; /* Οπτική ανατροφοδότηση εστίασης */
+        }
+
+        .custom-toggle-switch input:checked + .custom-toggle-slider:before {
+            transform: translateX(26px); /* Μετακίνηση του "δακτύλου" προς τα δεξιά */
+        }
+
+        .custom-toggle-label-text {
+            font-weight: 900; /* Μέτριο πάχος για καλύτερη αναγνωσιμότητα */
+            letter-spacing: .12em;          
+            color: #333; /* Χρώμα για το κείμενο του label */
+            margin-left: 5px; /* Προσαρμόστε την απόσταση μεταξύ slider και κειμένου */
+        }        
+        /**** END ---- ΔΙΑΚΟΠΤΗΣ επιλογής ΕΜΦΑΝΙΣΗΣ ΟΡΙΣΜΩΝ ή ΜΟΝΟ ΠΡΟΓΡΑΜΜΑΤΟΣ    ***/
+
+        /**** CSS for Filter Section Labels and Selects */
+           .filter-section {
+                margin-top: -0px !important;
+                margin-bottom: 5px !important;
+                padding-top: 0px !important;
+                box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+           }
+
+           
+           .row.g-3{
+            margin-top: 0px !important;
+            margin-bottom: 0px !important;
+           }
+            .col-md-4{
+                margin-top: 0px !important;
+            }           
+
+            .filter-section .form-label {
+                font-family: 'Inter', sans-serif; /* Ορισμός γραμματοσειράς */
+                font-size: 0.75em; /* Ελαφρώς μικρότερο μέγεθος για τα labels */
+                font-weight: 500; /* Μέτριο πάχος */
+                color: #003e5f; /* Ελαφρώς πιο σκούρο χρώμα */
+                margin-bottom: 0 !important; /* να φυγει το κενό από κάτω */
+
+            }
+
+            .filter-section .form-select {
+                font-family: 'Inter', sans-serif; /* Ορισμός γραμματοσειράς */
+                font-size: 0.85em; /* Μέγεθος γραμματοσειράς για τα dropdowns */
+                color: #495057; /* Προσαρμογή χρώματος κειμένου */
+            }
+        /**** END CSS for Filter Section Labels and Selects */
+
+        /**** TA FILTER είναι πέντε εδώ τα δύο κάτω Γήπεδο και ομάδες θα grouparistoyn kai θα κεντραριστούν*/
+
+            .centered-filter-group {
+                display: flex;
+                justify-content: center; /* Κεντράρει τα περιεχόμενα οριζόντια */
+                width: 100%; /* Το div καταλαμβάνει όλο το πλάτος */
+                flex-wrap: wrap; /* Επιτρέπει στα στοιχεία να πέφτουν σε νέα γραμμή σε μικρές οθόνες */
+            }
+
+            .centered-filter-group .col-md-4 {
+                /* Μπορεί να χρειαστεί προσαρμογή του πλάτους των στηλών
+                εντός του κεντραρισμένου group για καλύτερη εμφάνιση.
+                Εδώ, τα αφήνουμε όπως είναι για να κρατήσουν το 1/3 πλάτος σε md+.
+                Σε sm-, θα πέψουν σε νέα γραμμή λόγω Bootstrap. */
+                flex: 0 0 auto; /* Επαναφέρει flex-basis: auto */
+                width: auto; /* Επαναφέρει το πλάτος στο αυτόματο */
+            }
+        /**** END TA FILTER είναι πέντε εδώ τα δύο κάτω Γήπεδο και ομάδες θα grouparistoyn kai θα κεντραριστούν*/
+
+        /* ... ΤΟ ΚΕΙΜΕΝΟ ενδειξη κάτω κάτω μετά τους αγώνες για το πότε τυπώθηκε */
+
+            .ekasth-footer-text {
+                font-size: 0.75em; /* Μικρή γραμματοσειρά */
+                color: #888;      /* Γκρι χρώμα */
+                margin-top: 15px; /* Μικρή απόσταση από τον τελευταίο αγώνα */
+                margin-bottom: 1px !important;
+                /* Το text-center και τα margins θα προστεθούν με τις Bootstrap κλάσεις 'text-center', 'mt-3', 'mb-3' */
+            }
+
+            .ekasth-footer-version-text{
+                font-size: 0.50em; /* Μικρή γραμματοσειρά */
+                color: #aaa;     /* Γκρι χρώμα */
+                margin-top: 0px; /* Μικρή απόσταση από τον τελευταίο αγώνα */
+                /* Το text-center και τα margins θα προστεθούν με τις Bootstrap κλάσεις 'text-center', 'mt-3', 'mb-3' */
+            }
+
+        /**** ΤΟ ΚΕΙΜΕΝΟ ενδειξη κάτω κάτω μετά τους αγώνες για το πότε τυπώθηκε */
+
+        /***** Style for the Export PDF button */
+        .btn-pdf-export { /* Νέα κλάση για τα κουμπιά PDF για ομοιόμορφο στυλ */
+            margin: 20px auto 0 auto; /* Centering and spacing, 0 margin-top for flex container */
+            padding: 6px 12px;
+            font-size: 0.9em;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #exportPdfButtonHtml {
+            background-color: #007bff; /* Μπλε για HTML export */
+             display: none; /* ΠΡΟΣΘΗΚΗ / ΤΡΟΠΟΠΟΙΗΣΗ: Κρύβει το κουμπί αρχικά */
+        }
+        #exportPdfButtonHtml:hover {
+            background-color: #0056b3;
+        }
+        /* END Style for the Export PDF button */
+
+        /* Κρύψτε το Komisarios column σε οθόνες μικρότερες από το μέσο breakpoint (π.χ. 768px) */
+        @media (max-width: 767.98px) { /* Το 767.98px είναι το breakpoint του Bootstrap για sm προς md */
+            .komisarios-column-to-hide.invisible { /* Θα προσθέσουμε αυτή την κλάση με JS, ή απλά στοχεύστε το komisariosCol */
+                display: none !important; /* Χρησιμοποιήστε !important αν χρειάζεται να παρακάμψετε άλλους κανόνες */
+            }
+            .centered-filter-group .col-md-4 { /* Από medium και πάνω, τα κεντράρουμε */
+                width: 33.333333%; /* Για να διατηρηθεί το 1/3 πλάτος */
+            }            
+        }
+    </style>
+
+</head>
+<body>
+
+
+
+<div class="MatchCenterWidgetContainer">
+    <div class="MatchcenterWidget MatchcenterWidget--hp" id="matchcenter-homepage-widget" data-matchcenter-homepage-group="" data-matchcenter-homepage-b-group="">
+        <section class="MatchcenterHomepageWidget">
+
+            <div class="sticky-header-tabs">
+                <h3 class="MatchcenterHomepageWidget__header">
+                    MATCH<small class="text-body-secondary">CENTER</small>
+                </h3>
+
+                <div class="custom-toggle-container text-center mb-3">
+                    <label class="custom-toggle-switch">
+                        <span class="custom-toggle-label-text">ΑΓΩΝΕΣ</span>
+                        <input type="checkbox" id="toggleOrismoiDetails" checked>
+                        <span class="custom-toggle-slider"></span>
+                        <span class="custom-toggle-label-text">ΟΡΙΣΜΟΙ</span>
+                    </label>
+                </div>
+            </div>
+            <div class="tab-content" id="pills-tabContent">
+                <div class="tab-pane fade show active" id="pills-orismoi" role="tabpanel" aria-labelledby="pills-orismoi-tab" tabindex="0">
+                    <div class="filter-section p-3 bg-light rounded mb-3">
+                        <div class="centered-filter-group row g-3">
+
+                            <div class="col-md-4">
+                                <label for="refereeFilter" class="form-label">Διαιτητές:</label>
+                                <select class="form-select" id="refereeFilter">
+                                    <option value="Όλα">Όλα</option>
+                                    </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="commissionerFilter" class="form-label">Κομισάριος:</label>
+                                <select class="form-select" id="commissionerFilter">
+                                    <option value="Όλα">Όλα</option>
+                                    </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="judgeFilter" class="form-label">Κριτές:</label>
+                                <select class="form-select" id="judgeFilter">
+                                    <option value="Όλα">Όλα</option>
+                                    </select>
+                            </div>
+
+                            <div class="centered-filter-group row g-3 mt-2">
+
+                                <div class="col-md-4">
+                                    <label for="ghpedoFilter" class="form-label">Γήπεδο:</label>
+                                    <select class="form-select" id="ghpedoFilter">
+                                        <option value="Όλα">Όλα</option>
+                                        </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="teamFilter" class="form-label">Ομάδα:</label>
+                                    <select class="form-select" id="teamFilter">
+                                        <option value="Όλα">Όλα</option>
+                                        </select>
+                                </div>
+
+                            </div>    
+                        </div>
+                    </div>
+                    <div id="loadingSpinner" class="text-center my-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Φόρτωση δεδομένων...</p>
+                    </div>
+                    <div class="container text-center" id="pills-orismoi-container-id">
+                    </div>
+                    
+                    <!-- ΝΕΑ ΚΟΥΜΠΙΑ ΕΞΑΓΩΓΗΣ PDF -->
+                    <div class="d-flex justify-content-center gap-3 mt-4 mb-4">
+                        <button id="exportPdfButtonHtml" class="btn btn-pdf-export">Εξαγωγή σε PDF</button>                     
+                        <!-- ΕΞΑΓΩΓΗ PDF με τεχνική εικόνας δλδ HTML και όχι κειμένου -->
+
+                    </div>
+
+                </div>
+            </div>
+
+
+        </section>
+
+    </div>
+</div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-j1CDi7MgGQ12Z7Qab0qlWQ/Qqz24Gc6BM0thvEMVjHnfYGF0rmFCozFSxQBxwHKO" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" xintegrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" xintegrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAQxS8yBZM0NxN+KwQdWDVABgFTFcVJMiSABlSgk+SPyERowLhBCrGDsow==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</body>
+</html>
