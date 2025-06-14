@@ -141,8 +141,6 @@
         // Δημιουργία του URL για το Google Sheets API.
         const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetID}/gviz/tq?gid=${gid}&headers=1&tq=${encodedQueryString}`;
 
-        console.log("Συνταγμένο URL για το Google Sheet:", spreadsheetUrl);
-
         // Εκτέλεση του query.
         const query = new google.visualization.Query(spreadsheetUrl);
         query.send(handle_DrawDiorganvseis_DataQueryResponse);
@@ -323,17 +321,27 @@
 
                     // --- ΕΛΕΓΧΟΣ ΓΙΑ ΚΟΚΚΙΝΗ ΩΡΑ ---
                     let timeClass = 'MatchListItem__time'; // Η default κλάση
-                    if (matchStartDateTime && !isNaN(matchStartDateTime.getTime())) { // Βεβαιωθείτε ότι η ημερομηνία είναι έγκυρη
-                        const now = new Date(); // Η τρέχουσα ώρα
+
+                    // Βεβαιωθείτε ότι το matchStartDateTime είναι μια έγκυρη Date object
+                    if (matchStartDateTime && !isNaN(matchStartDateTime.getTime())) {
+                        const now = new Date(); // Η τρέχουσα ημερομηνία και ώρα
                         const twoHoursAfterStart = new Date(matchStartDateTime.getTime() + (2 * 60 * 60 * 1000)); // Ώρα έναρξης + 2 ώρες
 
-                        // Ελέγχουμε αν η τρέχουσα ώρα είναι ΜΕΤΑ την ώρα έναρξης
-                        // ΚΑΙ η τρέχουσα ώρα είναι ΠΡΙΝ από 2 ώρες μετά την ώρα έναρξης
-                        if (now >= matchStartDateTime && now < twoHoursAfterStart) {
+                        // Δημιουργούμε Date objects μόνο με την ημερομηνία (χωρίς ώρα) για σύγκριση ημερών
+                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const matchDate = new Date(matchStartDateTime.getFullYear(), matchStartDateTime.getMonth(), matchStartDateTime.getDate());
+
+                        // Ελέγχουμε αν:
+                        // 1. Ο αγώνας είναι την ΤΡΕΧΟΥΣΑ ΗΜΕΡΑ (matchDate === today)
+                        // 2. Η τρέχουσα ώρα είναι ΜΕΤΑ ή ίση με την ώρα έναρξης του αγώνα
+                        // 3. Η τρέχουσα ώρα είναι ΠΡΙΝ από 2 ώρες μετά την ώρα έναρξης του αγώνα
+                        if (matchDate.getTime() === today.getTime() && // Έλεγχος αν είναι η ίδια ημέρα
+                            now.getTime() >= matchStartDateTime.getTime() &&
+                            now.getTime() < twoHoursAfterAfterStart.getTime()) {
+                            
                             timeClass += ' highlight-time'; // Προσθέτουμε την κλάση για κόκκινο χρώμα
-                            //-- *** την timeClass θα την χρησιμοποιήσουμε παρακάτω στο σημείο όπου αποτυπώνεται ο χρόνος
                         }
-                    }                    
+                    }                 
 
 
                     const dateObject = data.getValue(row, 3);
